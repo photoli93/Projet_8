@@ -4,7 +4,7 @@ import random
 import pandas as pd
 
 # Charger les données des clients (assurez-vous que client_data est chargé correctement)
-client_data = pd.read_csv('client_data.csv')
+client_data = pd.read_csv('data/source/client_data.csv')
 
 # Titre de l'application Streamlit
 st.title("Prédiction de scoring client")

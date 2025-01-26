@@ -59,3 +59,14 @@ if st.button("Prédire"):
                 st.write(f"Prêt refusé: {emoji}")
         else:
             st.write("Erreur: ", response.json()['error'])
+
+# Afficher les informations descriptives du client
+client_info = client_data[client_data['num__SK_ID_CURR'] == client_id]
+if not client_info.empty:
+    st.write("### Informations du client")
+    st.write(client_info.T)  # Affichage des infos sous forme de tableau
+else:
+    st.write("Aucune information trouvée pour cet ID client.")
+
+
+

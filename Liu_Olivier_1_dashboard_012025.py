@@ -78,108 +78,89 @@ with col2:
             if client_info:
                 # Transformer en DataFrame pour un affichage tabulaire
                 client_info_df = pd.DataFrame(client_info.items(), columns=["Nom de la feature", "Valeur"])
-                
-                with st.expander("📌 Informations détaillées du client"):
-                    st.dataframe(client_info_df, width=1500, height=500)
+                st.dataframe(client_info_df, width=1500, height=500)
+
             else:
                 st.warning("Aucune information trouvée pour cet ID client.")
         else:
             st.error(f"Erreur API : {response.status_code} - {response.json().get('error', 'Erreur inconnue')}")
 
-# # Informations du client dans la colonne de droite
-# with col2:
-#     st.header("Informations du client")  # Header pour la colonne droite
+# ------------------------------------------------------------------------------------
 
-#     client_info = client_data[client_data['num__SK_ID_CURR'] == client_id]
-#     if not client_info.empty:
-#         client_info_transposed = client_info.T.reset_index()  # Transposer et réinitialiser l'index
-#         client_info_transposed.columns = ["Nom de la feature", "Valeur"]  # Renommer les colonnes
-#         st.dataframe(client_info_transposed, width=1500, height=500)
-#     else:
-#         st.write("Aucune information trouvée pour cet ID client.")
+# Visualisation des features
+st.header("Visualisation des features")
 
-# # ------------------------------------------------------------------------------------
+client_info = client_data[client_data['num__SK_ID_CURR'] == client_id]
+# Sélection de deux caractéristiques
+feature1 = st.selectbox("Choisissez la première caractéristique", client_data.columns, index=client_data.columns.get_loc('num__AMT_INCOME_TOTAL'))
+feature2 = st.selectbox("Choisissez la deuxième caractéristique", client_data.columns, index=client_data.columns.get_loc('num__AMT_CREDIT'))
 
-# st.header("Visualisation des features")
+# Détection du type des variables
+is_feature1_numeric = pd.api.types.is_numeric_dtype(client_data[feature1])
+is_feature2_numeric = pd.api.types.is_numeric_dtype(client_data[feature2])
+fig, ax = plt.subplots(figsize=(8, 5))
+if is_feature1_numeric and is_feature2_numeric:
+    # Scatter plot pour 2 variables numériques
+    sns.scatterplot(x=client_data[feature1], y=client_data[feature2], alpha=0.5, ax=ax, label="Tous les clients")
+    sns.scatterplot(x=client_info[feature1], y=client_info[feature2], color='red', ax=ax, label="Client sélectionné", s=100)
+    ax.set_title(f"Relation entre {feature1} et {feature2}")
 
-# # Sélection de deux caractéristiques
-# feature1 = st.selectbox("Choisissez la première caractéristique", client_data.columns, index=client_data.columns.get_loc('num__AMT_INCOME_TOTAL'))
-# feature2 = st.selectbox("Choisissez la deuxième caractéristique", client_data.columns, index=client_data.columns.get_loc('num__AMT_CREDIT'))
+elif not is_feature1_numeric and is_feature2_numeric:
+    # Boxplot pour une variable catégorielle et une numérique
+    sns.boxplot(x=client_data[feature1], y=client_data[feature2], ax=ax)
 
-# # Détection du type des variables
-# is_feature1_numeric = pd.api.types.is_numeric_dtype(client_data[feature1])
-# is_feature2_numeric = pd.api.types.is_numeric_dtype(client_data[feature2])
+    # Ajout du client sélectionné avec un léger "jitter" pour éviter qu'il se superpose exactement à la médiane
+    x_pos = np.where(client_data[feature1].unique() == client_info[feature1])[0][0]  
+    ax.scatter(x_pos, client_info[feature2], color='red', s=100, label="Client sélectionné")
+    ax.set_title(f"Distribution de {feature2} en fonction de {feature1}")
+elif is_feature1_numeric and not is_feature2_numeric:
+    # Même logique que ci-dessus mais avec les axes correctement ordonnés
+    sns.boxplot(x=client_data[feature2], y=client_data[feature1], ax=ax)
+    x_pos = np.where(client_data[feature2].unique() == client_info[feature2])[0][0]  
+    ax.scatter(x_pos, client_info[feature1], color='red', s=100, label="Client sélectionné")
+    ax.set_title(f"Distribution de {feature1} en fonction de {feature2}")
+elif not is_feature1_numeric and not is_feature2_numeric:
+    # Countplot pour 2 variables catégorielles
+    sns.countplot(x=client_data[feature1], hue=client_data[feature2], ax=ax)
+    ax.set_title(f"Répartition de {feature2} en fonction de {feature1}")
+ax.legend()
+st.pyplot(fig)
 
-# fig, ax = plt.subplots(figsize=(8, 5))
+# ------------------------------------------------------------------------------------
 
-# if is_feature1_numeric and is_feature2_numeric:
-#     # Scatter plot pour 2 variables numériques
-#     sns.scatterplot(x=client_data[feature1], y=client_data[feature2], alpha=0.5, ax=ax, label="Tous les clients")
-#     sns.scatterplot(x=client_info[feature1], y=client_info[feature2], color='red', ax=ax, label="Client sélectionné", s=100)
-#     ax.set_title(f"Relation entre {feature1} et {feature2}")
+st.header("Matrice de corrélation des features numériques")
 
-# elif not is_feature1_numeric and is_feature2_numeric:
-#     # Boxplot pour une variable catégorielle et une numérique
-#     sns.boxplot(x=client_data[feature1], y=client_data[feature2], ax=ax)
+# Sélectionner uniquement les colonnes numériques
+numeric_cols = client_data.select_dtypes(include=['number']).columns[:15].tolist()
 
-#     # Ajout du client sélectionné avec un léger "jitter" pour éviter qu'il se superpose exactement à la médiane
-#     x_pos = np.where(client_data[feature1].unique() == client_info[feature1])[0][0]  
-#     ax.scatter(x_pos, client_info[feature2], color='red', s=100, label="Client sélectionné")
+# Vérifier s'il y a au moins une colonne numérique
+if numeric_cols:
+    # Calculer la matrice de corrélation
+    corr_matrix = client_data[numeric_cols].corr()
 
-#     ax.set_title(f"Distribution de {feature2} en fonction de {feature1}")
+    # Sélectionner une feature
+    selected_feature = st.selectbox("Choisissez une feature à mettre en évidence", numeric_cols)
 
-# elif is_feature1_numeric and not is_feature2_numeric:
-#     # Même logique que ci-dessus mais avec les axes correctement ordonnés
-#     sns.boxplot(x=client_data[feature2], y=client_data[feature1], ax=ax)
+    # Création d'un masque pour mettre en évidence la colonne et la ligne sélectionnées
+    mask = np.zeros_like(corr_matrix)
+    idx = numeric_cols.index(selected_feature)
+    mask[idx, :] = 1  # Ligne
+    mask[:, idx] = 1  # Colonne
 
-#     x_pos = np.where(client_data[feature2].unique() == client_info[feature2])[0][0]  
-#     ax.scatter(x_pos, client_info[feature1], color='red', s=100, label="Client sélectionné")
+    # Création du graphique
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="coolwarm", center=0, linewidths=0.5, ax=ax,
+                cbar=True, mask=(1 - mask), alpha=0.7)  # Applique un masque léger sur les autres valeurs
 
-#     ax.set_title(f"Distribution de {feature1} en fonction de {feature2}")
+    sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="YlGnBu", center=0, linewidths=0.5, ax=ax,
+                cbar=False, mask=mask, alpha=1)  # Mise en surbrillance de la feature sélectionnée
 
-# elif not is_feature1_numeric and not is_feature2_numeric:
-#     # Countplot pour 2 variables catégorielles
-#     sns.countplot(x=client_data[feature1], hue=client_data[feature2], ax=ax)
-#     ax.set_title(f"Répartition de {feature2} en fonction de {feature1}")
+    # Ajouter un titre
+    ax.set_title(f"Matrice de corrélation - {selected_feature} mis en évidence", fontsize=14)
 
-# ax.legend()
-# st.pyplot(fig)
+    # Afficher la heatmap dans Streamlit
+    st.pyplot(fig)
 
-# # ------------------------------------------------------------------------------------
-
-# st.header("Matrice de corrélation des features numériques")
-
-# # Sélectionner uniquement les colonnes numériques
-# numeric_cols = client_data.select_dtypes(include=['number']).columns[:15].tolist()
-
-# # Vérifier s'il y a au moins une colonne numérique
-# if numeric_cols:
-#     # Calculer la matrice de corrélation
-#     corr_matrix = client_data[numeric_cols].corr()
-
-#     # Sélectionner une feature
-#     selected_feature = st.selectbox("Choisissez une caractéristique à mettre en évidence", numeric_cols)
-
-#     # Création d'un masque pour mettre en évidence la colonne et la ligne sélectionnées
-#     mask = np.zeros_like(corr_matrix)
-#     idx = numeric_cols.index(selected_feature)
-#     mask[idx, :] = 1  # Ligne
-#     mask[:, idx] = 1  # Colonne
-
-#     # Création du graphique
-#     fig, ax = plt.subplots(figsize=(10, 8))
-#     sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="coolwarm", center=0, linewidths=0.5, ax=ax,
-#                 cbar=True, mask=(1 - mask), alpha=0.7)  # Applique un masque léger sur les autres valeurs
-
-#     sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="YlGnBu", center=0, linewidths=0.5, ax=ax,
-#                 cbar=False, mask=mask, alpha=1)  # Mise en surbrillance de la feature sélectionnée
-
-#     # Ajouter un titre
-#     ax.set_title(f"Matrice de corrélation - {selected_feature} mis en évidence", fontsize=14)
-
-#     # Afficher la heatmap dans Streamlit
-#     st.pyplot(fig)
-
-# else:
-#     st.write("Aucune colonne numérique disponible pour calculer la matrice de corrélation.")
+else:
+    st.write("Aucune colonne numérique disponible pour calculer la matrice de corrélation.")
 
